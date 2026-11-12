@@ -1,13 +1,11 @@
-## Build
+## Run Tests
 
 ```sh
 cc -o nob nob.c && ./nob
 ```
 
-## Debug Build
-
-```sh
-cc -o nob nob.c && ./nob -debug
+```
+./build/tests
 ```
 
 ## compile_commands.json

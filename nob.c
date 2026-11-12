@@ -1,9 +1,8 @@
 #define NOB_IMPLEMENTATION
 #include "nob.h"
 
-#define SRC_DIR "src/"
-#define INCLUDE_DIR "include/"
 #define BUILD_DIR "build/"
+#define TESTS_DIR "tests/"
 #define LIBRARY_NAME "xarena"
 
 int main(int argc, char **argv) {
@@ -14,8 +13,8 @@ int main(int argc, char **argv) {
   Nob_Cmd cmd = {0};
 
   nob_cmd_append(&cmd, "cc");
-  nob_cmd_append(&cmd, "-c");
   nob_cmd_append(&cmd, "-Wall");
+  nob_cmd_append(&cmd, "-Werror");
   nob_cmd_append(&cmd, "-Wextra");
   nob_cmd_append(&cmd, "-Wdouble-promotion");
   nob_cmd_append(&cmd, "-Wpedantic");
@@ -24,18 +23,14 @@ int main(int argc, char **argv) {
   nob_cmd_append(&cmd, "-Wundef");
   nob_cmd_append(&cmd, "-Wformat=2");
   nob_cmd_append(&cmd, "-std=c99");
-
-  nob_cmd_append(&cmd, "-o", BUILD_DIR LIBRARY_NAME ".o");
-  nob_cmd_append(&cmd, SRC_DIR "x_arena.c");
-  nob_cmd_append(&cmd, "-I" INCLUDE_DIR);
-
-  if (!nob_cmd_run(&cmd)) {
-    return 1;
-  }
-
-  nob_cmd_append(&cmd, "ar", "rcs");
-  nob_cmd_append(&cmd, BUILD_DIR "lib" LIBRARY_NAME ".a");
-  nob_cmd_append(&cmd, BUILD_DIR LIBRARY_NAME ".o");
+  nob_cmd_append(&cmd, "-g");
+  nob_cmd_append(&cmd, "-O0");
+  nob_cmd_append(&cmd, "-fsanitize=address,undefined");
+  nob_cmd_append(&cmd, "-fno-omit-frame-pointer");
+  nob_cmd_append(&cmd, "-fno-sanitize-recover=all");
+  nob_cmd_append(&cmd, "-I./");
+  nob_cmd_append(&cmd, "-o" BUILD_DIR "tests");
+  nob_cmd_append(&cmd, TESTS_DIR "test.c");
 
   if (!nob_cmd_run(&cmd)) {
     return 1;
