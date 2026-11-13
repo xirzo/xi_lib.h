@@ -1,5 +1,5 @@
-#ifndef X_ARENA_H
-#define X_ARENA_H
+#ifndef XI_ARENA_H
+#define XI_ARENA_H
 
 // https://zylinski.se/posts/dynamic-arrays-and-arenas/
 // https://www.youtube.com/watch?v=TZ5a3gCCZYo&t=3413s
@@ -14,50 +14,50 @@ typedef struct {
   void  *data;
   size_t stack_pointer;
   size_t capacity;
-} X_Arena;
+} Xi_Arena;
 
 typedef struct {
   size_t   mark;
-  X_Arena *arena;
-} X_Scratch_Arena;
+  Xi_Arena *arena;
+} Xi_Scratch_Arena;
 
-X_Arena x_arena_allocate(size_t size);
+Xi_Arena xi_arena_allocate(size_t size);
 
-void x_arena_release(X_Arena *arena);
+void xi_arena_release(Xi_Arena *arena);
 
-void *x_arena_push(X_Arena *arena, size_t size);
+void *xi_arena_push(Xi_Arena *arena, size_t size);
 
-void x_arena_pop(X_Arena *arena, size_t size);
+void xi_arena_pop(Xi_Arena *arena, size_t size);
 
-void x_arena_clear(X_Arena *arena);
+void xi_arena_clear(Xi_Arena *arena);
 
-X_Scratch_Arena x_arena_scratch_create(X_Arena *arena);
+Xi_Scratch_Arena xi_arena_scratch_create(Xi_Arena *arena);
 
-void x_arena_scratch_release(X_Scratch_Arena scratch);
+void xi_arena_scratch_release(Xi_Scratch_Arena scratch);
 
-#endif  // X_ARENA_H
+#endif  // XI_ARENA_H
 
-#ifdef X_ARENA_IMPLEMENTATION
-#ifndef X_ARENA_IMPLEMENTATION_ONCE
-#define X_ARENA_IMPLEMENTATION_ONCE
+#ifdef XI_ARENA_IMPLEMENTATION
+#ifndef XI_ARENA_IMPLEMENTATION_ONCE
+#define XI_ARENA_IMPLEMENTATION_ONCE
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define X_ARENA_DEFAULT_ALIGN 8
+#define XI_ARENA_DEFAULT_ALIGN 8
 
-static uintptr_t x_arena_align_up(uintptr_t value, uintptr_t alignment) {
+static uintptr_t xi_arena_align_up(uintptr_t value, uintptr_t alignment) {
   return (value + alignment - 1) & ~(alignment - 1);
 }
 
-X_Arena x_arena_allocate(size_t size) {
-  X_Arena arena = {0};
+Xi_Arena xi_arena_allocate(size_t size) {
+  Xi_Arena arena = {0};
   if (size == 0) {
     return arena;
   }
 
-  size_t rounded = x_arena_align_up(size, X_ARENA_DEFAULT_ALIGN);
+  size_t rounded = xi_arena_align_up(size, XI_ARENA_DEFAULT_ALIGN);
   arena.data     = malloc(rounded);
   if (arena.data == NULL) {
     exit(EXIT_FAILURE);
@@ -68,7 +68,7 @@ X_Arena x_arena_allocate(size_t size) {
   return arena;
 }
 
-void x_arena_release(X_Arena *arena) {
+void xi_arena_release(Xi_Arena *arena) {
   if (arena == NULL || arena->data == NULL) {
     return;
   }
@@ -79,13 +79,13 @@ void x_arena_release(X_Arena *arena) {
   arena->capacity      = 0;
 }
 
-void *x_arena_push(X_Arena *arena, size_t size) {
+void *xi_arena_push(Xi_Arena *arena, size_t size) {
   if (arena == NULL || arena->data == NULL) {
     return NULL;
   }
 
   size_t aligned_stack_pointer =
-      x_arena_align_up(arena->stack_pointer, X_ARENA_DEFAULT_ALIGN);
+      xi_arena_align_up(arena->stack_pointer, XI_ARENA_DEFAULT_ALIGN);
   if (aligned_stack_pointer > arena->capacity ||
       size > arena->capacity - aligned_stack_pointer) {
     return NULL;
@@ -97,7 +97,7 @@ void *x_arena_push(X_Arena *arena, size_t size) {
   return ptr;
 }
 
-void x_arena_pop(X_Arena *arena, size_t size) {
+void xi_arena_pop(Xi_Arena *arena, size_t size) {
   if (arena == NULL || arena->stack_pointer < size) {
     return;
   }
@@ -107,7 +107,7 @@ void x_arena_pop(X_Arena *arena, size_t size) {
   arena->stack_pointer -= size;
 }
 
-void x_arena_clear(X_Arena *arena) {
+void xi_arena_clear(Xi_Arena *arena) {
   if (arena == NULL) {
     return;
   }
@@ -115,18 +115,18 @@ void x_arena_clear(X_Arena *arena) {
   arena->stack_pointer = 0;
 }
 
-X_Scratch_Arena x_arena_scratch_create(X_Arena *arena) {
+Xi_Scratch_Arena xi_arena_scratch_create(Xi_Arena *arena) {
   if (arena == NULL) {
-    return (X_Scratch_Arena){0};
+    return (Xi_Scratch_Arena){0};
   }
 
-  X_Scratch_Arena scratch = {0};
+  Xi_Scratch_Arena scratch = {0};
   scratch.mark            = arena->stack_pointer;
   scratch.arena           = arena;
   return scratch;
 }
 
-void x_arena_scratch_release(X_Scratch_Arena scratch) {
+void xi_arena_scratch_release(Xi_Scratch_Arena scratch) {
   if (scratch.arena == NULL) {
     return;
   }
@@ -138,5 +138,5 @@ void x_arena_scratch_release(X_Scratch_Arena scratch) {
   scratch.arena->stack_pointer = scratch.mark;
 }
 
-#endif  // X_ARENA_IMPLEMENTATION_ONCE
-#endif  // X_ARENA_IMPLEMENTATION
+#endif  // XI_ARENA_IMPLEMENTATION_ONCE
+#endif  // XI_ARENA_IMPLEMENTATION

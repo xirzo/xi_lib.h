@@ -1,6 +1,6 @@
 #include "test.h"
 #define XI_STRING_IMPLEMENTATION
-#include "x_string.h"
+#include "xi_string.h"
 #include <string.h>
 
 void test_x_string_append_cstr(void) {
