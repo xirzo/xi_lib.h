@@ -1,5 +1,5 @@
-#ifndef X_DYNAMIC_ARRAY_H_
-#define X_DYNAMIC_ARRAY_H_
+#ifndef XI_DYNAMIC_ARRAY_H_
+#define XI_DYNAMIC_ARRAY_H_
 
 #include <stddef.h>
 
@@ -49,66 +49,60 @@
 #define XI_DA_SORT(array_ptr, compare_func)                                    \
   xi_da_sort((array_ptr), (compare_func))
 
-enum Xi_DA_Result {
+typedef enum {
   XI_DA_SUCCESS = 0,
-  XI_DA_FAILED_TO_ALLOCATE_MEMORY,
+  XI_DA_OUT_OF_MEMORY,
   XI_DA_EMPTY,
   XI_DA_OUT_OF_BOUNDS,
-};
+} Xi_DA_Result;
 
-// The backing storage lives in an Xi_Arena, so there is nothing to free:
-// xi_da_free only detaches the array from its memory.
-typedef struct Xi_Dynamic_Array Xi_Dynamic_Array;
-
-struct Xi_Dynamic_Array {
+typedef struct {
   void *data;
   Xi_Arena *arena;
   size_t element_size;
   size_t size;
   size_t capacity;
-};
+} Xi_Dynamic_Array;
 
-enum Xi_DA_Result xi_da_init(struct Xi_Dynamic_Array *array, Xi_Arena *arena,
-                             size_t capacity, size_t element_size);
+Xi_DA_Result xi_da_init(Xi_Dynamic_Array *array, Xi_Arena *arena,
+                        size_t capacity, size_t element_size);
 
-enum Xi_DA_Result xi_da_push(struct Xi_Dynamic_Array *array,
-                             const void *element);
+Xi_DA_Result xi_da_push(Xi_Dynamic_Array *array, const void *element);
 
-void *xi_da_get(struct Xi_Dynamic_Array *array, size_t index);
+void *xi_da_get(Xi_Dynamic_Array *array, size_t index);
 
-enum Xi_DA_Result xi_da_pop(struct Xi_Dynamic_Array *array, void *out_element);
+Xi_DA_Result xi_da_pop(Xi_Dynamic_Array *array, void *out_element);
 
-enum Xi_DA_Result xi_da_free(struct Xi_Dynamic_Array *array);
+Xi_DA_Result xi_da_free(Xi_Dynamic_Array *array);
 
-enum Xi_DA_Result xi_da_insert(struct Xi_Dynamic_Array *array, size_t index,
-                               const void *element);
+Xi_DA_Result xi_da_insert(Xi_Dynamic_Array *array, size_t index,
+                          const void *element);
 
-enum Xi_DA_Result xi_da_replace(struct Xi_Dynamic_Array *array, size_t index,
-                                const void *element);
+Xi_DA_Result xi_da_replace(Xi_Dynamic_Array *array, size_t index,
+                           const void *element);
 
-enum Xi_DA_Result xi_da_remove(struct Xi_Dynamic_Array *array, size_t index);
+Xi_DA_Result xi_da_remove(Xi_Dynamic_Array *array, size_t index);
 
-enum Xi_DA_Result xi_da_clear(struct Xi_Dynamic_Array *array);
+Xi_DA_Result xi_da_clear(Xi_Dynamic_Array *array);
 
-enum Xi_DA_Result xi_da_shrink_to_fit(struct Xi_Dynamic_Array *array);
+Xi_DA_Result xi_da_shrink_to_fit(Xi_Dynamic_Array *array);
 
-enum Xi_DA_Result xi_da_swap(struct Xi_Dynamic_Array *array, size_t index1,
-                             size_t index2);
+Xi_DA_Result xi_da_swap(Xi_Dynamic_Array *array, size_t index1, size_t index2);
 
-enum Xi_DA_Result xi_da_sort(struct Xi_Dynamic_Array *array,
-                             int (*compare)(const void *, const void *));
+Xi_DA_Result xi_da_sort(Xi_Dynamic_Array *array,
+                        int (*compare)(const void *, const void *));
 
-#ifdef X_DYNAMIC_ARRAY_IMPLEMENTATION
+#ifdef XI_DYNAMIC_ARRAY_IMPLEMENTATION
 
 #include <stdlib.h>
 #include <string.h>
 
 #define XI_DA_RESIZE_MULTIPLIER 2
 
-enum Xi_DA_Result xi_da_init(struct Xi_Dynamic_Array *array, Xi_Arena *arena,
-                             size_t capacity, size_t element_size) {
+Xi_DA_Result xi_da_init(Xi_Dynamic_Array *array, Xi_Arena *arena,
+                        size_t capacity, size_t element_size) {
   if (!array || !arena || element_size == 0) {
-    return XI_DA_FAILED_TO_ALLOCATE_MEMORY;
+    return XI_DA_OUT_OF_MEMORY;
   }
 
   array->arena        = arena;
@@ -118,13 +112,13 @@ enum Xi_DA_Result xi_da_init(struct Xi_Dynamic_Array *array, Xi_Arena *arena,
   array->data         = xi_arena_push(arena, capacity * element_size);
 
   if (!array->data) {
-    return XI_DA_FAILED_TO_ALLOCATE_MEMORY;
+    return XI_DA_OUT_OF_MEMORY;
   }
 
   return XI_DA_SUCCESS;
 }
 
-static enum Xi_DA_Result xi_da_resize(struct Xi_Dynamic_Array *array) {
+static Xi_DA_Result xi_da_resize(Xi_Dynamic_Array *array) {
   size_t new_capacity = array->capacity * XI_DA_RESIZE_MULTIPLIER;
 
   if (new_capacity == 0) {
@@ -133,7 +127,7 @@ static enum Xi_DA_Result xi_da_resize(struct Xi_Dynamic_Array *array) {
 
   void *new_data = xi_arena_push(array->arena, new_capacity * array->element_size);
   if (!new_data) {
-    return XI_DA_FAILED_TO_ALLOCATE_MEMORY;
+    return XI_DA_OUT_OF_MEMORY;
   }
 
   if (array->data && array->size > 0) {
@@ -145,14 +139,13 @@ static enum Xi_DA_Result xi_da_resize(struct Xi_Dynamic_Array *array) {
   return XI_DA_SUCCESS;
 }
 
-enum Xi_DA_Result xi_da_push(struct Xi_Dynamic_Array *array,
-                             const void *element) {
+Xi_DA_Result xi_da_push(Xi_Dynamic_Array *array, const void *element) {
   if (!array || !element) {
-    return XI_DA_FAILED_TO_ALLOCATE_MEMORY;
+    return XI_DA_OUT_OF_MEMORY;
   }
 
   if (array->size >= array->capacity) {
-    enum Xi_DA_Result resize_result = xi_da_resize(array);
+    Xi_DA_Result resize_result = xi_da_resize(array);
 
     if (resize_result != XI_DA_SUCCESS) {
       return resize_result;
@@ -167,7 +160,7 @@ enum Xi_DA_Result xi_da_push(struct Xi_Dynamic_Array *array,
   return XI_DA_SUCCESS;
 }
 
-void *xi_da_get(struct Xi_Dynamic_Array *array, size_t index) {
+void *xi_da_get(Xi_Dynamic_Array *array, size_t index) {
   if (!array || index >= array->size) {
     return NULL;
   }
@@ -175,7 +168,7 @@ void *xi_da_get(struct Xi_Dynamic_Array *array, size_t index) {
   return (char *)array->data + (array->element_size * index);
 }
 
-enum Xi_DA_Result xi_da_pop(struct Xi_Dynamic_Array *array, void *out_element) {
+Xi_DA_Result xi_da_pop(Xi_Dynamic_Array *array, void *out_element) {
   if (!array || array->size == 0) {
     return XI_DA_EMPTY;
   }
@@ -191,12 +184,11 @@ enum Xi_DA_Result xi_da_pop(struct Xi_Dynamic_Array *array, void *out_element) {
   return XI_DA_SUCCESS;
 }
 
-enum Xi_DA_Result xi_da_free(struct Xi_Dynamic_Array *array) {
+Xi_DA_Result xi_da_free(Xi_Dynamic_Array *array) {
   if (!array) {
     return XI_DA_SUCCESS;
   }
 
-  // The arena owns the storage; nothing to free.
   array->data         = NULL;
   array->arena        = NULL;
   array->element_size = 0;
@@ -206,14 +198,14 @@ enum Xi_DA_Result xi_da_free(struct Xi_Dynamic_Array *array) {
   return XI_DA_SUCCESS;
 }
 
-enum Xi_DA_Result xi_da_insert(struct Xi_Dynamic_Array *array, size_t index,
-                               const void *element) {
+Xi_DA_Result xi_da_insert(Xi_Dynamic_Array *array, size_t index,
+                          const void *element) {
   if (!array || index > array->size) {
     return XI_DA_OUT_OF_BOUNDS;
   }
 
   if (array->size >= array->capacity) {
-    enum Xi_DA_Result resize_result = xi_da_resize(array);
+    Xi_DA_Result resize_result = xi_da_resize(array);
     if (resize_result != XI_DA_SUCCESS) {
       return resize_result;
     }
@@ -233,8 +225,8 @@ enum Xi_DA_Result xi_da_insert(struct Xi_Dynamic_Array *array, size_t index,
   return XI_DA_SUCCESS;
 }
 
-enum Xi_DA_Result xi_da_replace(struct Xi_Dynamic_Array *array, size_t index,
-                                const void *element) {
+Xi_DA_Result xi_da_replace(Xi_Dynamic_Array *array, size_t index,
+                           const void *element) {
   if (!array || index >= array->size) {
     return XI_DA_EMPTY;
   }
@@ -245,7 +237,7 @@ enum Xi_DA_Result xi_da_replace(struct Xi_Dynamic_Array *array, size_t index,
   return XI_DA_SUCCESS;
 }
 
-enum Xi_DA_Result xi_da_remove(struct Xi_Dynamic_Array *array, size_t index) {
+Xi_DA_Result xi_da_remove(Xi_Dynamic_Array *array, size_t index) {
   if (!array || index >= array->size) {
     return XI_DA_OUT_OF_BOUNDS;
   }
@@ -262,7 +254,7 @@ enum Xi_DA_Result xi_da_remove(struct Xi_Dynamic_Array *array, size_t index) {
   return XI_DA_SUCCESS;
 }
 
-enum Xi_DA_Result xi_da_clear(struct Xi_Dynamic_Array *array) {
+Xi_DA_Result xi_da_clear(Xi_Dynamic_Array *array) {
   if (!array) {
     return XI_DA_EMPTY;
   }
@@ -271,7 +263,7 @@ enum Xi_DA_Result xi_da_clear(struct Xi_Dynamic_Array *array) {
   return XI_DA_SUCCESS;
 }
 
-enum Xi_DA_Result xi_da_shrink_to_fit(struct Xi_Dynamic_Array *array) {
+Xi_DA_Result xi_da_shrink_to_fit(Xi_Dynamic_Array *array) {
   if (!array) {
     return XI_DA_EMPTY;
   }
@@ -288,7 +280,7 @@ enum Xi_DA_Result xi_da_shrink_to_fit(struct Xi_Dynamic_Array *array) {
 
   void *new_data = xi_arena_push(array->arena, array->size * array->element_size);
   if (!new_data) {
-    return XI_DA_FAILED_TO_ALLOCATE_MEMORY;
+    return XI_DA_OUT_OF_MEMORY;
   }
 
   memcpy(new_data, array->data, array->size * array->element_size);
@@ -298,8 +290,8 @@ enum Xi_DA_Result xi_da_shrink_to_fit(struct Xi_Dynamic_Array *array) {
   return XI_DA_SUCCESS;
 }
 
-enum Xi_DA_Result xi_da_swap(struct Xi_Dynamic_Array *array, size_t index1,
-                             size_t index2) {
+Xi_DA_Result xi_da_swap(Xi_Dynamic_Array *array, size_t index1,
+                        size_t index2) {
   if (!array || index1 >= array->size || index2 >= array->size) {
     return XI_DA_OUT_OF_BOUNDS;
   }
@@ -319,8 +311,8 @@ enum Xi_DA_Result xi_da_swap(struct Xi_Dynamic_Array *array, size_t index1,
   return XI_DA_SUCCESS;
 }
 
-enum Xi_DA_Result xi_da_sort(struct Xi_Dynamic_Array *array,
-                             int (*compare)(const void *, const void *)) {
+Xi_DA_Result xi_da_sort(Xi_Dynamic_Array *array,
+                        int (*compare)(const void *, const void *)) {
   if (!array) {
     return XI_DA_EMPTY;
   }
@@ -335,6 +327,6 @@ enum Xi_DA_Result xi_da_sort(struct Xi_Dynamic_Array *array,
   return XI_DA_SUCCESS;
 }
 
-#endif  // X_DYNAMIC_ARRAY_IMPLEMENTATION
+#endif
 
-#endif  // X_DYNAMIC_ARRAY_H_
+#endif

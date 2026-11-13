@@ -1,7 +1,7 @@
 #include "test.h"
 #define XI_ARENA_IMPLEMENTATION
 #include "xi_arena.h"
-#define X_DYNAMIC_ARRAY_IMPLEMENTATION
+#define XI_DYNAMIC_ARRAY_IMPLEMENTATION
 #include "xi_dynamic_array.h"
 #include <string.h>
 
@@ -42,7 +42,7 @@ void test_xi_da_pop(void) {
 
   // Act
   int popped = 0;
-  enum Xi_DA_Result result = XI_DA_POP(&array, &popped);
+  Xi_DA_Result result = XI_DA_POP(&array, &popped);
 
   // Assert
   ASSERT_EQ(XI_DA_SUCCESS, (int)result);
