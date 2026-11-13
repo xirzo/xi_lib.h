@@ -5,17 +5,18 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "xi_arena.h"
+
 typedef struct {
   char *data;
   size_t length;
   size_t capacity;
+  Xi_Arena *arena;
 } Xi_String;
 
-Xi_String xi_string_create(const char *cstr);
+Xi_String xi_string_create(Xi_Arena *arena, const char *cstr);
 
-Xi_String xi_string_create_empty(size_t capacity);
-
-void xi_string_free(Xi_String *string);
+Xi_String xi_string_create_empty(Xi_Arena *arena, size_t capacity);
 
 const char *xi_string_get_cstr(const Xi_String *string);
 
@@ -71,58 +72,45 @@ Xi_String *xi_string_split(const Xi_String *string, const char *delimiter,
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+
+// NOTE: xi_arena.h must be compiled with XI_ARENA_IMPLEMENTATION somewhere in
+// the program (define it before including xi_string.h or xi_arena.h in one
+// translation unit).
 
 #define XI_STRING_CAPACITY_MULTIPLIER 2
 
-static void *xi_string_xmalloc(size_t size) {
-  void *ptr = malloc(size);
-  if (!ptr) {
-    fprintf(stderr, "Fatal error: Out of memory.\n");
-    abort();
-  }
-  return ptr;
-}
-
-Xi_String xi_string_create(const char *cstr) {
+Xi_String xi_string_create(Xi_Arena *arena, const char *cstr) {
+  assert(arena != NULL);
   assert(cstr != NULL);
   size_t length = strlen(cstr);
   size_t capacity = length * XI_STRING_CAPACITY_MULTIPLIER;
 
-  char *data = xi_string_xmalloc(sizeof(char) * (capacity + 1));
+  char *data = xi_arena_push(arena, capacity + 1);
+  assert(data != NULL);
   strcpy(data, cstr);
 
   return (Xi_String){
       .data = data,
       .length = length,
       .capacity = capacity,
+      .arena = arena,
   };
 }
 
-Xi_String xi_string_create_empty(size_t capacity) {
-  char *data = xi_string_xmalloc(capacity + 1);
+Xi_String xi_string_create_empty(Xi_Arena *arena, size_t capacity) {
+  assert(arena != NULL);
+
+  char *data = xi_arena_push(arena, capacity + 1);
+  assert(data != NULL);
   data[0] = '\0';
 
   return (Xi_String){
       .data = data,
       .length = 0,
       .capacity = capacity,
+      .arena = arena,
   };
-}
-
-void xi_string_free(Xi_String *string) {
-  if (!string) {
-    return;
-  }
-
-  if (string->data) {
-    free(string->data);
-  }
-
-  string->data = NULL;
-  string->length = 0;
-  string->capacity = 0;
 }
 
 const char *xi_string_get_cstr(const Xi_String *string) {
@@ -133,30 +121,36 @@ const char *xi_string_get_cstr(const Xi_String *string) {
 Xi_String xi_string_duplicate(const Xi_String *string) {
   assert(string != NULL);
   assert(string->data != NULL);
+  assert(string->arena != NULL);
 
-  char *new_data = xi_string_xmalloc(string->capacity + 1);
+  char *new_data = xi_arena_push(string->arena, string->capacity + 1);
+  assert(new_data != NULL);
   memcpy(new_data, string->data, string->length + 1);
 
   return (Xi_String){
       .data = new_data,
       .length = string->length,
       .capacity = string->capacity,
+      .arena = string->arena,
   };
 }
 
 bool xi_string_resize(Xi_String *string, size_t new_capacity) {
   assert(string != NULL);
+  assert(string->arena != NULL);
   assert(string->capacity >= string->length);
 
   if (new_capacity == string->capacity) {
     return true;
   }
 
-  char *new_data = realloc(string->data, new_capacity + 1);
+  char *new_data = xi_arena_push(string->arena, new_capacity + 1);
 
   if (!new_data) {
     return false;
   }
+
+  memcpy(new_data, string->data, string->length + 1);
 
   string->data = new_data;
   string->capacity = new_capacity;
@@ -283,6 +277,7 @@ void xi_string_clear(Xi_String *string) {
 bool xi_string_printf(Xi_String *string, const char *format, ...) {
   assert(string != NULL);
   assert(format != NULL);
+  assert(string->arena != NULL);
 
   va_list args;
   va_start(args, format);
@@ -300,9 +295,20 @@ bool xi_string_printf(Xi_String *string, const char *format, ...) {
     return false;
   }
 
+  Xi_Scratch_Arena scratch = xi_arena_scratch_create(string->arena);
+  char *formatted = xi_arena_push(string->arena, needed_size + 1);
+
+  if (!formatted) {
+    return false;
+  }
+
   va_start(args, format);
-  vsnprintf(string->data, needed_size + 1, format, args);
+  vsnprintf(formatted, needed_size + 1, format, args);
   va_end(args);
+
+  memcpy(string->data, formatted, needed_size + 1);
+
+  xi_arena_scratch_release(scratch);
 
   string->length = needed_size;
   return true;
@@ -310,15 +316,18 @@ bool xi_string_printf(Xi_String *string, const char *format, ...) {
 
 bool xi_string_shrink(Xi_String *string) {
   assert(string != NULL);
+  assert(string->arena != NULL);
 
   if (string->length == string->capacity) {
     return true;
   }
 
-  char *tmp = realloc(string->data, string->length + 1);
+  char *tmp = xi_arena_push(string->arena, string->length + 1);
   if (!tmp) {
     return false;
   }
+
+  memcpy(tmp, string->data, string->length + 1);
 
   string->data = tmp;
   string->capacity = string->length;
@@ -482,6 +491,7 @@ int xi_string_find_last(const Xi_String *string, const char *search) {
 
 Xi_String xi_string_substring(const Xi_String *string, size_t index, size_t length) {
   assert(string != NULL);
+  assert(string->arena != NULL);
   assert(string->capacity >= string->length);
   assert(index <= string->length);
 
@@ -489,7 +499,7 @@ Xi_String xi_string_substring(const Xi_String *string, size_t index, size_t leng
     length = string->length - index;
   }
 
-  Xi_String substring = xi_string_create_empty(length);
+  Xi_String substring = xi_string_create_empty(string->arena, length);
 
   if (length > 0) {
     memcpy(substring.data, string->data + index, length);
@@ -504,6 +514,7 @@ Xi_String xi_string_substring(const Xi_String *string, size_t index, size_t leng
 Xi_String *xi_string_split(const Xi_String *string, const char *delimiter,
                          size_t *out_count) {
   assert(string != NULL);
+  assert(string->arena != NULL);
   assert(delimiter != NULL);
   assert(out_count != NULL);
 
@@ -511,44 +522,75 @@ Xi_String *xi_string_split(const Xi_String *string, const char *delimiter,
 
   assert(delim_length > 0);
 
-  size_t count = 1;
-  size_t current_pos = 0;
+  Xi_Arena *arena = string->arena;
 
+  Xi_Scratch_Arena scratch = xi_arena_scratch_create(arena);
+  Xi_Arena *scratch_arena = scratch.arena;
+
+  size_t positions_capacity = 8;
+  size_t delimiter_count = 0;
+  size_t *positions =
+      xi_arena_push(scratch_arena, positions_capacity * sizeof *positions);
+
+  if (!positions) {
+    *out_count = 0;
+    return NULL;
+  }
+
+  size_t current_pos = 0;
   while (current_pos + delim_length <= string->length) {
     if (memcmp(string->data + current_pos, delimiter, delim_length) == 0) {
-      count++;
+      if (delimiter_count == positions_capacity) {
+        positions_capacity *= XI_STRING_CAPACITY_MULTIPLIER;
+        size_t *grown =
+            xi_arena_push(scratch_arena, positions_capacity * sizeof *grown);
+
+        if (!grown) {
+          xi_arena_pop(scratch_arena, scratch_arena->stack_pointer - scratch.mark);
+          *out_count = 0;
+          return NULL;
+        }
+
+        memcpy(grown, positions, delimiter_count * sizeof *grown);
+        positions = grown;
+      }
+
+      positions[delimiter_count++] = current_pos;
       current_pos += delim_length;
     } else {
       current_pos++;
     }
   }
 
-  Xi_String *results = malloc(count * sizeof(Xi_String));
+  memmove((char *)scratch_arena->data + scratch.mark, positions,
+          delimiter_count * sizeof *positions);
+  xi_arena_pop(scratch_arena, scratch_arena->stack_pointer -
+                                  (scratch.mark +
+                                   delimiter_count * sizeof *positions));
+  positions = (size_t *)((char *)scratch_arena->data + scratch.mark);
+
+  Xi_String *results =
+      xi_arena_push(arena, (delimiter_count + 1) * sizeof *results);
+
   if (!results) {
+    xi_arena_pop(scratch_arena, scratch_arena->stack_pointer - scratch.mark);
     *out_count = 0;
     return NULL;
   }
 
   size_t start_idx = 0;
-  size_t result_idx = 0;
-  current_pos = 0;
+  for (size_t i = 0; i < delimiter_count; i++) {
+    size_t match_pos = 0;
+    memcpy(&match_pos, positions + i, sizeof match_pos);
 
-  while (current_pos + delim_length <= string->length) {
-    if (memcmp(string->data + current_pos, delimiter, delim_length) == 0) {
-      size_t chunk_length = current_pos - start_idx;
-      results[result_idx++] = xi_string_substring(string, start_idx, chunk_length);
-
-      current_pos += delim_length;
-      start_idx = current_pos;
-    } else {
-      current_pos++;
-    }
+    results[i] = xi_string_substring(string, start_idx, match_pos - start_idx);
+    start_idx = match_pos + delim_length;
   }
 
-  results[result_idx] =
+  results[delimiter_count] =
       xi_string_substring(string, start_idx, string->length - start_idx);
 
-  *out_count = count;
+  *out_count = delimiter_count + 1;
   return results;
 }
 
